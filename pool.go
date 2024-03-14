@@ -1,4 +1,4 @@
-package pool
+package connectpool
 
 import (
 	"log"

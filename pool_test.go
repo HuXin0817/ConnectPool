@@ -1,4 +1,4 @@
-package pool
+package connectpool
 
 import (
 	"fmt"
@@ -21,7 +21,7 @@ func mockConnectMethod() any {
 	c := cnt.Add(1) // Increment the global counter
 
 	log.Printf("new connect %v\n", c) // Log the creation of a new connection
-	return c                           // Return the incremented counter as the connection identifier
+	return c                          // Return the incremented counter as the connection identifier
 }
 
 // mockCloseFunc simulates a connection close function, logging the identifier of the connection being closed.

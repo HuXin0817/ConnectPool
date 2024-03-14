@@ -1,7 +1,5 @@
 # Connect Pool
 
-[English Docx](./README.md) | [Chinese Docx](./README_CN.md)
-
 Connect Pool is a Go package designed to efficiently manage a pool of connections. It abstracts the complexity of handling multiple concurrent connections, ensuring optimal resource utilization and simplifying the process of creating, using, and disposing of connections. This document outlines the Connect Pool's functionalities and provides a guide on how to use it in your Go applications.
 
 ## Features
@@ -21,7 +19,13 @@ Below is a basic guide on how to integrate and use the Connect Pool in a Go appl
 
 ### Installation
 
-Ensure you have Go installed on your machine (visit [Go's official site](https://golang.org/dl/) for installation instructions). Then, import the Connect Pool package into your project:
+Ensure you have Go installed on your machine (visit [Go's official site](https://golang.org/dl/) for installation instructions). Then, input the order on your Terminal:
+
+```shell
+$ go get -u github.com/HuXin0817/ConnectPool
+```
+
+import the Connect Pool package into your project:
 
 ```go
 import "github.com/HuXin0817/ConnectPool"
