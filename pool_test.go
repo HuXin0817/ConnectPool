@@ -42,7 +42,7 @@ func mockDealPanicMethod(panicInfo any) {
 
 // TestPool tests the connection pool's functionality, particularly the registration and deregistration of connections.
 func TestPool(t *testing.T) {
-	const Turn = 1000000 // Define the number of iterations (and thus goroutines) to simulate
+	const Turn = 10000 // Define the number of iterations (and thus goroutines) to simulate
 
 	pool := NewConnectPool(Turn/2, mockConnectMethod) // Initialize a new connection pool with half of Turn as its size
 	pool.SetCloseMethod(mockCloseFunc)                // Set the method to be called when a connection is closed

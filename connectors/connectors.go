@@ -9,14 +9,15 @@ import (
 )
 
 const (
-	DefaultMaxFreeTime       = time.Second // Default maximum idle wait time
-	DefaultAutoCleanInterval = time.Second // Default auto-clean cycle execution
+	DefaultMaxFreeTime       = 3 * time.Second // Default maximum idle wait time
+	DefaultAutoCleanInterval = 3 * time.Second // Default auto-clean cycle execution
 )
 
 type ConnectorSet interface {
 	AddConnector(connectMethod *func() any, dealPanicMethod *func(panicInfo any)) (newConnector connector.Connector) // Adds a new Connector
 	GetFreeConnector() connector.Connector                                                                           // Retrieves a free Connector
 	Size() int                                                                                                       // Returns the size of the connector set
+	WorkingNumber() int64                                                                                            // Returns the count of the Working Connector
 	Close()                                                                                                          // Closes the ConnectorSet, terminating the Set's AutoClear
 	Clear(maxFreeTime *time.Duration, closeMethod *func(any), dealPanicMethod *func(any))                            // Actively performs a cleanup
 	autoClear(autoClearInterval, maxFreeTime *time.Duration, closeMethod *func(any), dealPanicMethod *func(any))     // Asynchronously performs the auto-cleanup function
@@ -171,4 +172,18 @@ func (s *autoClearConnectorSet) Close() {
 
 	s.closed.Store(true)  // Signals the autoClear coroutine to terminate
 	clear(s.connectorSet) // Cleans up the connectorSet to avoid memory usage
+}
+
+func (s *autoClearConnectorSet) WorkingNumber() int64 {
+	s.connectorSetRWMutex.RLock()
+	defer s.connectorSetRWMutex.RUnlock()
+
+	cnt := int64(0)
+	for _, v := range s.connectorSet {
+		if !v.IsFree() {
+			cnt++
+		}
+	}
+
+	return cnt
 }

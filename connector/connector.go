@@ -16,7 +16,7 @@ type Connector interface {
 }
 
 type connector struct {
-	connect         atomic.Value  // Connection variable
+	connect         any           // Connection variable
 	isWorking       atomic.Bool   // Working state
 	lastWorkingTime atomic.Value  // Last work time, stored as time.Time
 	waitCloseState  atomic.Bool   // State of waiting to automatically stop working
@@ -46,14 +46,14 @@ func NewConnector(connectMethod *func() any, dealPanicMethod *func(any)) Connect
 		}
 
 		// Store the connection variable in c.connect
-		c.connect.Store((*connectMethod)())
+		c.connect = (*connectMethod)()
 	}()
 
 	return c
 }
 
 func (c *connector) GetConnect() any {
-	return c.connect.Load()
+	return c.connect
 }
 
 func (c *connector) StartWorking() {

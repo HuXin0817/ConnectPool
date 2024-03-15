@@ -22,15 +22,16 @@ var DefaultDealPanicMethod = func(panicInfo any) {
 type ConnectPool interface {
 	Register() (newConnect any, cancelFunc func())                                    // Registers a connection
 	RegisterWithTimeLimit(deadLine time.Duration) (newConnect any, cancelFunc func()) // Registers a connection with a deadline
-	WorkingNumber() int64                                                             // Gets the number of active connections
-	MaxSize() int64                                                                   // Gets the pool's maximum size
-	SetMaxSize(size int64)                                                            // Sets the pool's maximum size
+	WorkingNumber() int                                                               // Gets the number of active connections
+	PoolSize() int                                                                    // Gets the pool's size
+	MaxSize() int                                                                     // Gets the pool's maximum size
+	SetMaxSize(size int)                                                              // Sets the pool's maximum size
 	MaxFreeTime() time.Duration                                                       // Gets the maximum idle time for connectors
-	SetMaxFreeTime(time.Duration)                                                     // Sets the maximum idle time for connectors
+	SetMaxFreeTime(maxFreeTime time.Duration)                                         // Sets the maximum idle time for connectors
 	AutoClearInterval() time.Duration                                                 // Gets the interval for auto-clearing
-	SetAutoClearInterval(time.Duration)                                               // Sets the interval for auto-clearing
-	SetDealPanicMethod(func(panicInfo any))                                           // Sets the method for handling panic
-	SetCloseMethod(func(any))                                                         // Sets the method to execute before closing a connection
+	SetAutoClearInterval(autoClearInterval time.Duration)                             // Sets the interval for auto-clearing
+	SetDealPanicMethod(dealPanicMethod func(panicInfo any))                           // Sets the method for handling panic
+	SetCloseMethod(closeMethod func(any))                                             // Sets the method to execute before closing a connection
 	Close()                                                                           // Closes the pool
 }
 
@@ -54,7 +55,7 @@ func NewConnectPool(maxSize int, connectMethod func() any) ConnectPool {
 		dealPanicMethod:   DefaultDealPanicMethod,
 	}
 
-	pool.maxSize.Store(int64(maxSize))
+	pool.SetMaxSize(maxSize)
 	pool.pool = connectors.NewConnectorSet(&pool.autoClearInterval, &pool.maxFreeTime, &pool.closeMethod, &pool.dealPanicMethod)
 	return pool
 }
@@ -76,7 +77,7 @@ func (p *connectPool) searchConnector() (Connect connector.Connector) {
 		maxSize := p.MaxSize() // Get the maximum number of connections in the pool
 
 		// Check if the pool has reached its maximum size, if not, create a new Connector
-		if p.WorkingNumber() < maxSize {
+		if p.PoolSize() < maxSize {
 			return p.pool.AddConnector(&p.connectMethod, &p.dealPanicMethod) // Create and return a new Connector in the pool
 		}
 
@@ -104,16 +105,16 @@ func (p *connectPool) RegisterWithTimeLimit(deadLine time.Duration) (newConnect 
 	return c.GetConnect(), c.StopWorking
 }
 
-func (p *connectPool) WorkingNumber() int64 {
-	return int64(p.pool.Size())
+func (p *connectPool) WorkingNumber() int {
+	return int(p.pool.WorkingNumber())
 }
 
-func (p *connectPool) MaxSize() int64 {
-	return p.maxSize.Load()
+func (p *connectPool) MaxSize() int {
+	return int(p.maxSize.Load())
 }
 
-func (p *connectPool) SetMaxSize(size int64) {
-	p.maxSize.Store(size)
+func (p *connectPool) SetMaxSize(size int) {
+	p.maxSize.Store(int64(size))
 }
 
 func (p *connectPool) SetDealPanicMethod(dealPanicMethod func(panicInfo any)) {
@@ -138,6 +139,10 @@ func (p *connectPool) SetAutoClearInterval(autoCleanInterval time.Duration) {
 
 func (p *connectPool) SetCloseMethod(closeMethod func(any)) {
 	p.closeMethod = closeMethod
+}
+
+func (p *connectPool) PoolSize() int {
+	return p.pool.Size()
 }
 
 func (p *connectPool) Close() {
