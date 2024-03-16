@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	DefaultMaxFreeTime       = 3 * time.Second // Default maximum idle wait time
-	DefaultAutoCleanInterval = 3 * time.Second // Default auto-clean cycle execution
+	DefaultMaxFreeTime       = 5 * time.Second // Default maximum idle wait time
+	DefaultAutoCleanInterval = 2 * time.Second // Default auto-clean cycle execution
 )
 
 type ConnectorSet interface {
