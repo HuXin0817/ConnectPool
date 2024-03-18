@@ -1,78 +1,81 @@
-# Connect Pool
+# Go Connection Pool
 
-Connect Pool is a Go package designed to efficiently manage a pool of connections. It abstracts the complexity of handling multiple concurrent connections, ensuring optimal resource utilization and simplifying the process of creating, using, and disposing of connections. This document outlines the Connect Pool's functionalities and provides a guide on how to use it in your Go applications.
+A lightweight, efficient, and thread-safe connection pool management library in Go. It's designed to maintain a pool of reusable connection objects, reducing the overhead of establishing connections frequently. The library provides mechanisms to obtain and release connections efficiently, handle connection timeouts, and automatically clean up idle connections.
 
 ## Features
 
-- **Dynamic Connection Management:** Automatically creates and closes connections based on demand, up to a specified maximum pool size.
-- **Connection Reuse:** Allows for the reuse of idle connections, reducing the overhead of establishing new connections.
-- **Concurrent Safe:** Designed to be safe for concurrent use by multiple goroutines.
-- **Auto-Clean:** Periodically clears idle connections that exceed a specified maximum free time, helping to release unused resources.
-- **Panic Handling:** Provides a mechanism to handle panics that occur during connection operations, enhancing the robustness of your application.
-- **Customizable Connection Logic:** Supports custom connection creation, closing, and panic handling functions to fit specific requirements.
+- **Thread-Safe Connection Handling**: Ensures that connections are safely shared among multiple goroutines.
+- **Automatic Connection Cleanup**: Periodically removes idle connections to free up resources.
+- **Flexible Connection Creation**: Supports custom connection creation logic.
+- **Panic Handling**: Includes mechanisms to deal with panics that may occur during connection use or initialization.
+- **Configurable Parameters**: Offers options to configure the pool size, idle timeout, auto-cleanup interval, and more.
 
-![](png/pool.png)
+![](./png/pool.png)
 
-## Usage
+## Components
 
-Below is a basic guide on how to integrate and use the Connect Pool in a Go application.
+The library consists of several key components:
+
+- **Connector Interface**: Defines the methods for a connection handler.
+- **AtomicConnector**: An implementation of the `Connector` interface, managing individual connection states atomically.
+- **ConnectorSet Interface**: Manages a set of `Connector` objects, providing methods to add, retrieve, and clean up connectors.
+- **AutoClearConnectorSet**: An implementation of the `ConnectorSet` interface, adding automatic cleanup capabilities.
+- **ConnectPool Interface**: Represents the overall connection pool, offering methods to register new connections, obtain connection statistics, and configure the pool.
+
+## Getting Started
 
 ### Installation
 
-Ensure you have Go installed on your machine (visit [Go's official site](https://golang.org/dl/) for installation instructions). Then, input the order on your Terminal:
+To use this library, first ensure you have Go installed on your system. Then, include the library in your project by copying the provided code into your project's directory.
 
-```shell
-$ go get -u github.com/HuXin0817/ConnectPool
+```bash
+go get github.com/HuXin0817/ConnectPool
 ```
 
-import the Connect Pool package into your project:
+### Usage
+
+To create a new connection pool, you need to define a connection creation method and optionally customize the pool with various configuration options. Here's a simple example:
 
 ```go
-import "github.com/HuXin0817/ConnectPool"
+package main
+
+import (
+    "fmt"
+    "time"
+)
+
+func main() {
+    // Define a method to create new connections. In this example, it's a dummy function.
+    connectMethod := func() any {
+        return "new connection" // Replace this with actual connection logic
+    }
+
+    // Create a new connection pool with default settings
+    pool := NewConnectPool(connectMethod)
+
+    // Register a new connection from the pool
+    newConnect, cancelFunc := pool.Register()
+    fmt.Println(newConnect) // Use the connection
+
+    // Once done, release the connection
+    cancelFunc()
+}
 ```
 
-### Creating a New Connection Pool
+### Configuration Options
 
-To create a new connection pool, you need to specify the maximum size of the pool and a function that defines how each connection is established:
+Customize your connection pool using the following options:
 
-```go
-pool := pool.NewConnectPool(100, mockConnectMethod)
-```
+- **WithCap(cap int)**: Set the maximum number of connections the pool can hold.
+- **WithMaxFreeTime(maxFreeTime time.Duration)**: Define the maximum time a connection can stay idle before being automatically cleaned up.
+- **WithAutoClearInterval(autoClearInterval time.Duration)**: Set the interval for the automatic cleanup task.
+- **WithDealPanicMethod(dealPanicMethod func(panicInfo any))**: Provide a custom method to handle panic scenarios.
+- **WithCloseMethod(closeMethod func(connect any))**: Specify a method to be called before closing a connection.
 
-`mockConnectMethod` is a function that returns a new connection object. This method is called whenever the pool needs to create a new connection.
+## Contributing
 
-### Registering and Using a Connection
+Contributions to improve the library are welcome. Please follow the standard fork-and-pull request workflow on GitHub.
 
-To use a connection from the pool:
+## License
 
-```go
-conn, cancelFunc := pool.Register()
-// Use the connection
-cancelFunc() // Release the connection back to the pool
-```
-
-### Setting Up Custom Handlers
-
-You can set custom methods for handling connection closure and panic scenarios:
-
-```go
-pool.SetCloseMethod(mockCloseFunc)
-pool.SetDealPanicMethod(mockDealPanicMethod)
-```
-
-### Configuring Auto-Clean Parameters
-
-The pool can be configured to automatically clean up idle connections that exceed a certain duration:
-
-```go
-pool.SetMaxFreeTime(30 * time.Second) // Set the maximum idle time before a connection is closed
-pool.SetAutoClearInterval(1 * time.Minute) // Set the interval for the auto-clean process
-```
-
-### Closing the Pool
-
-To close the pool and release all its resources:
-
-```go
-pool.Close()
-```
+Specify your license here or state that the project is unlicensed and available for free use.

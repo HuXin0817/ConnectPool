@@ -48,6 +48,7 @@ func printInfo() {
 }
 
 func main() {
+
 	go func() {
 		for {
 			printInfo() // Continuously print pool information.

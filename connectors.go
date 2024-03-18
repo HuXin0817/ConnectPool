@@ -71,8 +71,8 @@ func (s *autoClearConnectorSet) Clear(maxFreeTime *time.Duration, closeMethod *f
 func (s *autoClearConnectorSet) autoClear(autoClearInterval, maxFreeTime *time.Duration, closeMethod *func(any), dealPanicMethod *func(any)) {
 	for {
 
-		// Determines AutoClearInterval; uses DefaultAutoCleanInterval if autoClearInterval is nil
-		AutoClearInterval := DefaultAutoCleanInterval
+		// Determines AutoClearInterval; uses defaultAutoCleanInterval if autoClearInterval is nil
+		AutoClearInterval := defaultAutoCleanInterval
 		if autoClearInterval != nil {
 			AutoClearInterval = *autoClearInterval
 		}
@@ -80,8 +80,8 @@ func (s *autoClearConnectorSet) autoClear(autoClearInterval, maxFreeTime *time.D
 		// Creates a timer with a length of AutoClearInterval
 		timer := time.NewTimer(AutoClearInterval)
 
-		// Determines MaxFreeTime; uses DefaultMaxFreeTime if maxFreeTime is nil
-		MaxFreeTime := DefaultMaxFreeTime
+		// Determines MaxFreeTime; uses defaultMaxFreeTime if maxFreeTime is nil
+		MaxFreeTime := defaultMaxFreeTime
 		if maxFreeTime != nil {
 			MaxFreeTime = *maxFreeTime
 		}

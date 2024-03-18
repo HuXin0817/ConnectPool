@@ -8,12 +8,12 @@ import (
 )
 
 const (
-	DefaultMaxFreeTime       = 3 * time.Second // Default maximum idle wait time
-	DefaultAutoCleanInterval = 2 * time.Second // Default auto-clean cycle execution
-	DefaultCap               = 1000            // Default pool cap
+	defaultMaxFreeTime       = 3 * time.Second // Default maximum idle wait time
+	defaultAutoCleanInterval = 2 * time.Second // Default auto-clean cycle execution
+	defaultCap               = 1000            // Default pool cap
 )
 
-var DefaultDealPanicMethod = func(panicInfo any) {
+var defaultDealPanicMethod = func(panicInfo any) {
 	log.Println(panicInfo) // Default method for handling panic by logging the panicInfo
 }
 
@@ -43,10 +43,10 @@ func NewConnectPool(connectMethod func() any, options ...option) ConnectPool {
 	// Initially use default values, which can be modified using Set methods
 	pool := &connectPool{
 		connectMethod:     connectMethod,
-		autoClearInterval: DefaultAutoCleanInterval,
-		maxFreeTime:       DefaultMaxFreeTime,
-		dealPanicMethod:   DefaultDealPanicMethod,
-		cap:               DefaultCap,
+		autoClearInterval: defaultAutoCleanInterval,
+		maxFreeTime:       defaultMaxFreeTime,
+		cap:               defaultCap,
+		dealPanicMethod:   defaultDealPanicMethod,
 	}
 
 	for _, op := range options {
