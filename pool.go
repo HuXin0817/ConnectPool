@@ -39,7 +39,7 @@ type connectPool struct {
 }
 
 // NewConnectPool creates a new connection pool with a specified maximum size and connection creation method.
-func NewConnectPool(connectMethod func() any, options ...Option) ConnectPool {
+func NewConnectPool(connectMethod func() any, options ...option) ConnectPool {
 	// Initially use default values, which can be modified using Set methods
 	pool := &connectPool{
 		connectMethod:     connectMethod,

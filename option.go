@@ -2,33 +2,33 @@ package connectpool
 
 import "time"
 
-type Option func(*connectPool)
+type option func(*connectPool)
 
-func WithCap(cap int) Option {
+func WithCap(cap int) option {
 	return func(pool *connectPool) {
 		pool.cap = cap
 	}
 }
 
-func WithMaxFreeTime(maxFreeTime time.Duration) Option {
+func WithMaxFreeTime(maxFreeTime time.Duration) option {
 	return func(pool *connectPool) {
 		pool.maxFreeTime = maxFreeTime
 	}
 }
 
-func WithAutoClearInterval(autoClearInterval time.Duration) Option {
+func WithAutoClearInterval(autoClearInterval time.Duration) option {
 	return func(pool *connectPool) {
 		pool.autoClearInterval = autoClearInterval
 	}
 }
 
-func WithDealPanicMethod(dealPanicMethod func(panicInfo any)) Option {
+func WithDealPanicMethod(dealPanicMethod func(panicInfo any)) option {
 	return func(pool *connectPool) {
 		pool.dealPanicMethod = dealPanicMethod
 	}
 }
 
-func WithCloseMethod(closeMethod func(connect any)) Option {
+func WithCloseMethod(closeMethod func(connect any)) option {
 	return func(pool *connectPool) {
 		pool.closeMethod = closeMethod
 	}
