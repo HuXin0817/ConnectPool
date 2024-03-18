@@ -2,45 +2,14 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
-	"log"
 	"math/rand"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	connectpool "github.com/HuXin0817/ConnectPool" // Import the external package for connection pooling.
-	"github.com/go-redis/redis"                    // Import the Redis client package.
-	"gopkg.in/yaml.v3"                             // Import the YAML package for configuration parsing.
 )
-
-// Config struct to map the configuration file structure.
-type Config struct {
-	Redis Redis `yaml:"redis"` // Redis configuration section.
-}
-
-// Redis struct to hold Redis-specific configurations.
-type Redis struct {
-	Host string `yaml:"host"` // Redis server host.
-	Port int    `yaml:"port"` // Redis server port.
-}
-
-var DBConfig Config // Global variable to hold database configuration.
-
-const ConfigFilePath = "./config.yaml" // Path to the configuration file.
-
-// init function runs before main to load and parse the configuration file.
-func init() {
-	data, err := ioutil.ReadFile(ConfigFilePath) // Read the configuration file.
-	if err != nil {
-		log.Panicf("error: %v", err) // Log and panic on read error.
-	}
-
-	err = yaml.Unmarshal(data, &DBConfig) // Parse the YAML into the Config struct.
-	if err != nil {
-		log.Panicf("error: %v", err) // Log and panic on parsing error.
-	}
-}
 
 const PoolSize = 1000 // Size of the connection pool.
 
@@ -52,42 +21,21 @@ var (
 )
 
 var (
-	port = DBConfig.Redis.Port // Redis port from config.
-	host = DBConfig.Redis.Host // Redis host from config.
-
-	uri = fmt.Sprintf("%s:%d", host, port) // Construct the Redis URI.
-
 	r = rand.New(rand.NewSource(time.Now().UnixNano())) // Initialize a random number generator.
 )
 
 // connectMethod defines how to establish a new connection to Redis.
 func connectMethod() any {
-	connectId.Add(1) // Increment the connection ID counter.
-
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     uri,
-		Password: "", // Assuming no password is set.
-		DB:       0,  // Default database.
-	})
-
-	if rdb == nil {
-		log.Panicf("connect error! ConnectId: %d\n", connectId.Load()) // Panic if connection fails.
-	}
-
-	return rdb // Return the Redis client.
+	connectId.Add(1)        // Increment the connection ID counter.
+	return connectId.Load() // Return the Redis client.
 }
 
 // closeMethod defines how to close a Redis connection.
 func closeMethod(db any) {
 	closeId.Add(1) // Increment the close ID counter.
-
-	err := db.(*redis.Client).Close() // Close the Redis connection.
-	if err != nil {
-		panic(err) // Panic on close error.
-	}
 }
 
-var pool = connectpool.NewConnectPool(PoolSize, connectMethod) // Initialize the connection pool with the connect method.
+var pool = connectpool.NewConnectPool(connectMethod, connectpool.WithCap(PoolSize), connectpool.WithCloseMethod(closeMethod)) // Initialize the connection pool with the connect method.
 
 // printInfo prints out connection pool statistics.
 func printInfo() {
@@ -106,8 +54,6 @@ func main() {
 		}
 	}()
 
-	pool.SetCloseMethod(closeMethod) // Set the method to close a connection in the pool.
-
 	const turn = PoolSize * 5 // Define how many goroutines to spawn.
 
 	var wq sync.WaitGroup
@@ -119,11 +65,10 @@ func main() {
 
 			time.Sleep(time.Second * time.Duration(r.Int63()%5)) // Random sleep to simulate work.
 
-			c, cancel := pool.Register() // Register for a connection from the pool.
-			defer cancel()               // Ensure the connection is released.
+			c, cancel := pool.RegisterWithTimeLimit(time.Second * time.Duration(r.Int63()%5)) // Register for a connection from the pool.
+			defer cancel()                                                                    // Ensure the connection is released.
 
-			rdb := c.(*redis.Client) // Type assert to a Redis client.
-			rdb.Ping()               // Ping the Redis server.
+			_ = c
 
 			t.Add(1) // Increment the general counter.
 
@@ -133,8 +78,9 @@ func main() {
 
 	wq.Wait() // Wait for all goroutines to complete.
 
-	for pool.PoolSize() > 0 {
+	for pool.Size() > 0 {
 		// Wait for the pool to empty.
+		runtime.Gosched()
 	}
 
 	printInfo() // Print final pool information.

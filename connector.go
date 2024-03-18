@@ -1,11 +1,11 @@
-package connector
+package connectpool
 
 import (
 	"sync/atomic"
 	"time"
 )
 
-type Connector interface {
+type connector interface {
 	GetConnect() any                             // Get the Connector's connection variable
 	SinceLastWorkingTime() time.Duration         // Get the time since the Connector last worked
 	IsFree() bool                                // Determine if the Connector is free
@@ -15,7 +15,7 @@ type Connector interface {
 	Do(f *func(any), dealPanicMethod *func(any)) // Invoke an external method and handle any potential Panic
 }
 
-type connector struct {
+type atomicConnector struct {
 	connect         any           // Connection variable
 	isWorking       atomic.Bool   // Working state
 	lastWorkingTime atomic.Value  // Last work time, stored as time.Time
@@ -23,10 +23,10 @@ type connector struct {
 	stopSignalChan  chan struct{} // Channel for transmitting work stop signals
 }
 
-// NewConnector creates a new connector with connect as the connection variable
-func NewConnector(connectMethod *func() any, dealPanicMethod *func(any)) Connector {
+// newConnector creates a new connector with connect as the connection variable
+func newConnector(connectMethod *func() any, dealPanicMethod *func(any)) connector {
 
-	c := &connector{
+	c := &atomicConnector{
 		stopSignalChan: make(chan struct{}, 1), // Allocate a buffer of length 1 for stopSignalChan
 	}
 
@@ -52,15 +52,15 @@ func NewConnector(connectMethod *func() any, dealPanicMethod *func(any)) Connect
 	return c
 }
 
-func (c *connector) GetConnect() any {
+func (c *atomicConnector) GetConnect() any {
 	return c.connect
 }
 
-func (c *connector) StartWorking() {
+func (c *atomicConnector) StartWorking() {
 	c.isWorking.Store(true)
 }
 
-func (c *connector) StopWorking() {
+func (c *atomicConnector) StopWorking() {
 	c.isWorking.Store(false)  // Update the working state
 	c.updateLastWorkingTime() // Update the last working time
 
@@ -71,18 +71,18 @@ func (c *connector) StopWorking() {
 }
 
 // updateLastWorkingTime updates the working time to the most recent
-func (c *connector) updateLastWorkingTime() {
+func (c *atomicConnector) updateLastWorkingTime() {
 	c.lastWorkingTime.Store(time.Now())
 }
 
 // endTimingWork ends TimingWork
-func (c *connector) endTimingWork() {
+func (c *atomicConnector) endTimingWork() {
 	c.waitCloseState.Store(false) // End the connector's waitCloseState
 	c.isWorking.Store(false)
 	c.updateLastWorkingTime()
 }
 
-func (c *connector) StartTimingWork(deadline time.Duration) {
+func (c *atomicConnector) StartTimingWork(deadline time.Duration) {
 	// Start a new goroutine, asynchronously wait and end work
 	go func() {
 		c.waitCloseState.Store(true) // Make the connector enter waitCloseState
@@ -102,11 +102,11 @@ func (c *connector) StartTimingWork(deadline time.Duration) {
 	}()
 }
 
-func (c *connector) IsFree() bool {
+func (c *atomicConnector) IsFree() bool {
 	return !c.isWorking.Load()
 }
 
-func (c *connector) SinceLastWorkingTime() time.Duration {
+func (c *atomicConnector) SinceLastWorkingTime() time.Duration {
 	// If the connector is working, return 0
 	if !c.IsFree() {
 		return 0
@@ -116,7 +116,7 @@ func (c *connector) SinceLastWorkingTime() time.Duration {
 	return time.Since(t)
 }
 
-func (c *connector) Do(f *func(any), dealPanicMethod *func(any)) {
+func (c *atomicConnector) Do(f *func(any), dealPanicMethod *func(any)) {
 	defer func() {
 		// Handle any panic that occurs during work
 		if r := recover(); r != nil && dealPanicMethod != nil && *dealPanicMethod != nil {

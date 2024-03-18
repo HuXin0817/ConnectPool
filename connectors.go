@@ -1,42 +1,35 @@
-package connectors
+package connectpool
 
 import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/HuXin0817/ConnectPool/connector"
 )
 
-const (
-	DefaultMaxFreeTime       = 5 * time.Second // Default maximum idle wait time
-	DefaultAutoCleanInterval = 2 * time.Second // Default auto-clean cycle execution
-)
-
-type ConnectorSet interface {
-	AddConnector(connectMethod *func() any, dealPanicMethod *func(panicInfo any)) (newConnector connector.Connector) // Adds a new Connector
-	GetFreeConnector() connector.Connector                                                                           // Retrieves a free Connector
-	Size() int                                                                                                       // Returns the size of the connector set
-	WorkingNumber() int64                                                                                            // Returns the count of the Working Connector
-	Close()                                                                                                          // Closes the ConnectorSet, terminating the Set's AutoClear
-	Clear(maxFreeTime *time.Duration, closeMethod *func(any), dealPanicMethod *func(any))                            // Actively performs a cleanup
-	autoClear(autoClearInterval, maxFreeTime *time.Duration, closeMethod *func(any), dealPanicMethod *func(any))     // Asynchronously performs the auto-cleanup function
+type connectorSet interface {
+	AddConnector(connectMethod *func() any, dealPanicMethod *func(panicInfo any)) (newConnector connector)       // Adds a new Connector
+	GetFreeConnector() connector                                                                                 // Retrieves a free Connector
+	Size() int                                                                                                   // Returns the size of the connector set
+	WorkingNumber() int64                                                                                        // Returns the count of the Working Connector
+	Close()                                                                                                      // Closes the ConnectorSet, terminating the Set's AutoClear
+	Clear(maxFreeTime *time.Duration, closeMethod *func(any), dealPanicMethod *func(any))                        // Actively performs a cleanup
+	autoClear(autoClearInterval, maxFreeTime *time.Duration, closeMethod *func(any), dealPanicMethod *func(any)) // Asynchronously performs the auto-cleanup function
 }
 
 type autoClearConnectorSet struct {
-	token               atomic.Uint64                  // An internally incremented Token for encoding Connectors
-	closed              atomic.Bool                    // Indicates whether it's closed
-	connectorSet        map[uint64]connector.Connector // Collection of Connectors
-	connectorSetRWMutex sync.RWMutex                   // Read-write lock protecting the connector collection
+	token               atomic.Uint64        // An internally incremented Token for encoding Connectors
+	closed              atomic.Bool          // Indicates whether it's closed
+	connectorSet        map[uint64]connector // Collection of Connectors
+	connectorSetRWMutex sync.RWMutex         // Read-write lock protecting the connector collection
 }
 
-func NewConnectorSet(autoClearInterval, maxFreeTime *time.Duration, closeMethod *func(any), dealPanicMethod *func(any)) (newConnectorSet ConnectorSet) {
-	newConnectorSet = &autoClearConnectorSet{
-		connectorSet: make(map[uint64]connector.Connector),
+func newConnectorSet(autoClearInterval, maxFreeTime *time.Duration, closeMethod *func(any), dealPanicMethod *func(any)) (NewConnectorSet connectorSet) {
+	NewConnectorSet = &autoClearConnectorSet{
+		connectorSet: make(map[uint64]connector),
 	}
 
-	go newConnectorSet.autoClear(autoClearInterval, maxFreeTime, closeMethod, dealPanicMethod) // Starts a new goroutine to periodically clean up Connectors
-	return newConnectorSet
+	go NewConnectorSet.autoClear(autoClearInterval, maxFreeTime, closeMethod, dealPanicMethod) // Starts a new goroutine to periodically clean up Connectors
+	return NewConnectorSet
 }
 
 func (s *autoClearConnectorSet) Clear(maxFreeTime *time.Duration, closeMethod *func(any), dealPanicMethod *func(any)) {
@@ -108,7 +101,7 @@ func (s *autoClearConnectorSet) registerToken() uint64 {
 	return s.token.Add(1) // Increment token, ensuring a unique token value each time
 }
 
-func (s *autoClearConnectorSet) AddConnector(connectMethod *func() any, dealPanicMethod *func(panicInfo any)) (newConnector connector.Connector) {
+func (s *autoClearConnectorSet) AddConnector(connectMethod *func() any, dealPanicMethod *func(panicInfo any)) (NewConnector connector) {
 
 	var contains bool
 	var connectorToken uint64
@@ -132,17 +125,17 @@ func (s *autoClearConnectorSet) AddConnector(connectMethod *func() any, dealPani
 	s.connectorSetRWMutex.RUnlock()
 
 	// Obtains a new Connector
-	newConnector = connector.NewConnector(connectMethod, dealPanicMethod)
+	NewConnector = newConnector(connectMethod, dealPanicMethod)
 
 	s.connectorSetRWMutex.Lock()
-	// Inserts connectorToken and newConnector into the dictionary
-	s.connectorSet[connectorToken] = newConnector
+	// Inserts connectorToken and NewConnector into the dictionary
+	s.connectorSet[connectorToken] = NewConnector
 	s.connectorSetRWMutex.Unlock()
 
 	return
 }
 
-func (s *autoClearConnectorSet) GetFreeConnector() connector.Connector {
+func (s *autoClearConnectorSet) GetFreeConnector() connector {
 
 	// Uses a write lock to ensure the retrieved FreeConnector is only used by one owner
 	s.connectorSetRWMutex.Lock()

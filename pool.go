@@ -5,14 +5,12 @@ import (
 	"runtime"
 	"sync/atomic"
 	"time"
-
-	"github.com/HuXin0817/ConnectPool/connector"
-	"github.com/HuXin0817/ConnectPool/connectors"
 )
 
 const (
-	DefaultMaxFreeTime       = connectors.DefaultMaxFreeTime       // Default maximum idle wait time
-	DefaultAutoCleanInterval = connectors.DefaultAutoCleanInterval // Default auto-clean cycle execution period
+	DefaultMaxFreeTime       = 3 * time.Second // Default maximum idle wait time
+	DefaultAutoCleanInterval = 2 * time.Second // Default auto-clean cycle execution
+	DefaultCap               = 1000            // Default pool cap
 )
 
 var DefaultDealPanicMethod = func(panicInfo any) {
@@ -23,45 +21,44 @@ type ConnectPool interface {
 	Register() (newConnect any, cancelFunc func())                                    // Registers a connection
 	RegisterWithTimeLimit(deadLine time.Duration) (newConnect any, cancelFunc func()) // Registers a connection with a deadline
 	WorkingNumber() int                                                               // Gets the number of active connections
-	PoolSize() int                                                                    // Gets the pool's size
-	MaxSize() int                                                                     // Gets the pool's maximum size
-	SetMaxSize(size int)                                                              // Sets the pool's maximum size
+	Size() int                                                                        // Gets the pool's cap
+	Cap() int                                                                         // Gets the pool's maximum size
 	MaxFreeTime() time.Duration                                                       // Gets the maximum idle time for connectors
-	SetMaxFreeTime(maxFreeTime time.Duration)                                         // Sets the maximum idle time for connectors
 	AutoClearInterval() time.Duration                                                 // Gets the interval for auto-clearing
-	SetAutoClearInterval(autoClearInterval time.Duration)                             // Sets the interval for auto-clearing
-	SetDealPanicMethod(dealPanicMethod func(panicInfo any))                           // Sets the method for handling panic
-	SetCloseMethod(closeMethod func(any))                                             // Sets the method to execute before closing a connection
 	Close()                                                                           // Closes the pool
 }
 
 type connectPool struct {
-	autoClearInterval time.Duration           // Interval for auto-clearing cycles
-	maxFreeTime       time.Duration           // Maximum idle wait time
-	maxSize           atomic.Int64            // Maximum number of connections
-	pool              connectors.ConnectorSet // Pool of connectors
-	connectMethod     func() any              // Method for creating connections
-	dealPanicMethod   func(panicInfo any)     // Method for handling panic
-	closeMethod       func(connect any)       // Method to execute before closing a connection
+	autoClearInterval time.Duration       // Interval for auto-clearing cycles
+	maxFreeTime       time.Duration       // Maximum idle wait time
+	cap               int                 // Maximum number of connections
+	pool              connectorSet        // Pool of connectors
+	connectMethod     func() any          // Method for creating connections
+	dealPanicMethod   func(panicInfo any) // Method for handling panic
+	closeMethod       func(connect any)   // Method to execute before closing a connection
 }
 
 // NewConnectPool creates a new connection pool with a specified maximum size and connection creation method.
-func NewConnectPool(maxSize int, connectMethod func() any) ConnectPool {
+func NewConnectPool(connectMethod func() any, options ...Option) ConnectPool {
 	// Initially use default values, which can be modified using Set methods
 	pool := &connectPool{
 		connectMethod:     connectMethod,
 		autoClearInterval: DefaultAutoCleanInterval,
 		maxFreeTime:       DefaultMaxFreeTime,
 		dealPanicMethod:   DefaultDealPanicMethod,
+		cap:               DefaultCap,
 	}
 
-	pool.SetMaxSize(maxSize)
-	pool.pool = connectors.NewConnectorSet(&pool.autoClearInterval, &pool.maxFreeTime, &pool.closeMethod, &pool.dealPanicMethod)
+	for _, op := range options {
+		op(pool)
+	}
+
+	pool.pool = newConnectorSet(&pool.autoClearInterval, &pool.maxFreeTime, &pool.closeMethod, &pool.dealPanicMethod)
 	return pool
 }
 
 // searchConnector finds a connector in the connectPool.
-func (p *connectPool) searchConnector() (Connect connector.Connector) {
+func (p *connectPool) searchConnector() (Connect connector) {
 
 	freeConnect := p.pool.GetFreeConnector() // Try to get a free connector from the existing pool
 	if freeConnect != nil {
@@ -74,10 +71,10 @@ func (p *connectPool) searchConnector() (Connect connector.Connector) {
 			return
 		}
 
-		maxSize := p.MaxSize() // Get the maximum number of connections in the pool
+		maxSize := p.Cap() // Get the maximum number of connections in the pool
 
 		// Check if the pool has reached its maximum size, if not, create a new Connector
-		if p.PoolSize() < maxSize {
+		if p.Size() < maxSize {
 			return p.pool.AddConnector(&p.connectMethod, &p.dealPanicMethod) // Create and return a new Connector in the pool
 		}
 
@@ -109,39 +106,19 @@ func (p *connectPool) WorkingNumber() int {
 	return int(p.pool.WorkingNumber())
 }
 
-func (p *connectPool) MaxSize() int {
-	return int(p.maxSize.Load())
-}
-
-func (p *connectPool) SetMaxSize(size int) {
-	p.maxSize.Store(int64(size))
-}
-
-func (p *connectPool) SetDealPanicMethod(dealPanicMethod func(panicInfo any)) {
-	p.dealPanicMethod = dealPanicMethod
+func (p *connectPool) Cap() int {
+	return p.cap
 }
 
 func (p *connectPool) MaxFreeTime() time.Duration {
 	return time.Duration(atomic.LoadInt64((*int64)(&p.maxFreeTime)))
 }
 
-func (p *connectPool) SetMaxFreeTime(maxFreeTime time.Duration) {
-	atomic.StoreInt64((*int64)(&p.maxFreeTime), int64(maxFreeTime))
-}
-
 func (p *connectPool) AutoClearInterval() time.Duration {
 	return time.Duration(atomic.LoadInt64((*int64)(&p.autoClearInterval)))
 }
 
-func (p *connectPool) SetAutoClearInterval(autoCleanInterval time.Duration) {
-	atomic.StoreInt64((*int64)(&p.autoClearInterval), int64(autoCleanInterval))
-}
-
-func (p *connectPool) SetCloseMethod(closeMethod func(any)) {
-	p.closeMethod = closeMethod
-}
-
-func (p *connectPool) PoolSize() int {
+func (p *connectPool) Size() int {
 	return p.pool.Size()
 }
 
